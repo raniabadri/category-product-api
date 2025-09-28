@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id               String              @id @default(uuid()) @db.Uuid
+  parentCategoryId String?             @db.Uuid
+  image            String?
+  displayOrder     Int                 @default(10000)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  parent           Category?           @relation("CategoryToCategory", fields: [parentCategoryId], references: [id])
+  children         Category[]          @relation("CategoryToCategory")
+  contents         CategoryContent[]
+  products         ProductOnCategory[]
+}
+
+model CategoryContent {
+  id          String   @id @default(uuid()) @db.Uuid
+  categoryId  String   @db.Uuid
+  name        String
+  slug        String
+  description String?
+  language    Language
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([slug, language])
+}
+
+model Product {
+  id           String              @id @default(uuid()) @db.Uuid
+  displayOrder Int                 @default(10000)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  contents     ProductContent[]
+  items        ProductItem[]
+  categories   ProductOnCategory[]
+}
+
+model ProductContent {
+  id          String   @id @default(uuid()) @db.Uuid
+  productId   String   @db.Uuid
+  name        String
+  slug        String
+  description String?
+  details     String?
+  language    Language
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([slug, language])
+}
+
+model ProductOnCategory {
+  productId  String   @db.Uuid
+  categoryId String   @db.Uuid
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+}
+
+model ProductItem {
+  id         String                 @id @default(uuid()) @db.Uuid
+  productId  String                 @db.Uuid
+  barcode    String                 @unique
+  reference  String?                @unique
+  image      String?
+  online     Boolean                @default(true)
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  product    Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  prices     ProductItemPrice[]
+  variations ProductItemVariation[]
+}
+
+model ProductItemPrice {
+  id            String      @id @default(uuid()) @db.Uuid
+  productItemId String      @db.Uuid
+  price         Decimal?    @db.Decimal(10, 3)
+  currency      Currency
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  productItem   ProductItem @relation(fields: [productItemId], references: [id], onDelete: Cascade)
+}
+
+model ProductItemVariation {
+  id            String                        @id @default(uuid()) @db.Uuid
+  productItemId String                        @db.Uuid
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @updatedAt
+  productItem   ProductItem                   @relation(fields: [productItemId], references: [id], onDelete: Cascade)
+  contents      ProductItemVariationContent[]
+}
+
+model ProductItemVariationContent {
+  id                     String               @id @default(uuid()) @db.Uuid
+  productItemVariationId String               @db.Uuid
+  name                   String
+  value                  String
+  language               Language
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  variation              ProductItemVariation @relation(fields: [productItemVariationId], references: [id], onDelete: Cascade)
+}
+
+enum Language {
+  Arabic
+  English
+  French
+}
+
+enum Currency {
+  TND
+  USD
+  EUR
+}
