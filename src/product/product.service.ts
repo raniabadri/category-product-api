@@ -30,26 +30,31 @@ export class ProductService {
 
 async search(name?: string, description?: string, minPrice?: number, maxPrice?: number) {
   try {
-    const params: any[] = [];
-    let where = 'WHERE 1=1';
-    if (name) {
-      where += ' AND pc.name ILIKE $1';
-      params.push(`%${name}%`);
-    }
-    if (description) {
-      where += ' AND pc.description ILIKE $2';
-      params.push(`%${description}%`);
-    }
-    const sql = Prisma.sql`
-      SELECT p.* FROM "Product" p
-      JOIN "ProductContent" pc ON p.id = pc."productId"
-      LEFT JOIN "ProductItem" pi ON p.id = pi."productId"
-      LEFT JOIN "ProductItemPrice" pip ON pi.id = pip."productItemId"
-      ${Prisma.raw(where)}
-      GROUP BY p.id
-      HAVING MIN(COALESCE(pip.price, 0)) >= COALESCE($3, 0) AND MAX(COALESCE(pip.price, NULL)) <= COALESCE($4, NULL);
-    `;
-    return await this.prisma.$queryRaw(sql, ...params, minPrice, maxPrice);
+    return this.prisma.product.findMany({
+      include: { contents: true, items: { include: { prices: true } } },
+      where: {
+        contents: {
+          some: {
+            OR: [
+              name ? { name: { contains: name, mode: 'insensitive' } } : {},
+              description ? { description: { contains: description, mode: 'insensitive' } } : {},
+            ],
+          },
+        },
+        items: {
+          some: {
+            prices: {
+              some: {
+                price: {
+                  gte: minPrice || 0,
+                  lte: maxPrice || undefined,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
   } catch (error) {
     console.error('Error in search:', error);
     throw new Error('Failed to search products');

@@ -18,17 +18,75 @@ export class CategoryService {
     });
   }
 
-async findAll() {
-  return this.prisma.category.findMany({
-    where: { parentCategoryId: null }, // Récupère les racines
-    include: {
-      children: {
-        include: { contents: true },
-      },
-      contents: true,
-    },
-  });
-}
+  async findAll() {
+    try {
+      // Récupérer seulement les catégories parent avec leurs enfants et contenus
+      const categories = await this.prisma.category.findMany({
+        where: {
+          parentCategoryId: null // Seulement les catégories parent
+        },
+        include: {
+          contents: {
+            select: {
+              name: true,
+              slug: true,
+              language: true
+            }
+          },
+          children: {
+            include: {
+              contents: {
+                select: {
+                  name: true,
+                  slug: true,
+                  language: true
+                }
+              }
+            },
+            orderBy: {
+              displayOrder: 'asc'
+            }
+          }
+        },
+        orderBy: {
+          displayOrder: 'asc'
+        }
+      });
+
+      // Transformer au format attendu
+      return categories.map(category => ({
+        id: category.id,
+        parentCategoryId: category.parentCategoryId,
+        image: category.image,
+        displayOrder: category.displayOrder,
+        createdAt: category.createdAt,
+        updatedAt: category.updatedAt,
+        contents: category.contents.map(content => ({
+          name: content.name,
+          slug: content.slug,
+          language: content.language
+        })),
+        children: category.children.map(child => ({
+          id: child.id,
+          parentCategoryId: child.parentCategoryId,
+          image: child.image,
+          displayOrder: child.displayOrder,
+          createdAt: child.createdAt,
+          updatedAt: child.updatedAt,
+          contents: child.contents.map(content => ({
+            name: content.name,
+            slug: content.slug,
+            language: content.language
+          }))
+        }))
+      }));
+
+    } catch (error) {
+      console.error('Error in findAll:', error);
+      throw new Error(`Failed to fetch categories: ${error.message}`);
+    }
+  }
+
   async findOne(id: string) {
     return this.prisma.category.findUnique({
       where: { id },
